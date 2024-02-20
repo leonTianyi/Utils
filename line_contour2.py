@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from scipy.interpolate import splprep, splev
 
 def detect_white_spline(image):
     # Convert image to grayscale
@@ -30,15 +29,21 @@ def detect_white_spline(image):
     else:
         return None
 
-def generate_waypoints_along_spline(spline_points, num_waypoints=100):
-    # Fit a spline to the points
-    tck, _ = splprep([spline_points[:, 0], spline_points[:, 1]], s=0)
+def generate_equidistant_points(points, num_points):
+    # Calculate the total length of the contour
+    arc_lengths = np.cumsum(np.sqrt(np.sum(np.diff(points, axis=0)**2, axis=1)))
+    total_length = arc_lengths[-1]
     
-    # Generate equidistant waypoints along the spline
-    u = np.linspace(0, 1, num=num_waypoints)
-    waypoints = np.column_stack(splev(u, tck))
+    # Generate equidistant waypoints along the contour
+    equidistant_points = []
+    for i in range(num_points):
+        target_length = i * total_length / (num_points - 1)
+        idx = np.searchsorted(arc_lengths, target_length)
+        t = (target_length - arc_lengths[idx-1]) / (arc_lengths[idx] - arc_lengths[idx-1])
+        point = (1 - t) * points[idx-1] + t * points[idx]
+        equidistant_points.append(point)
     
-    return waypoints.tolist()
+    return np.array(equidistant_points)
 
 # Example usage:
 # Load your input image
@@ -48,8 +53,8 @@ input_image = cv2.imread('input_image.jpg')
 spline_points = detect_white_spline(input_image)
 
 if spline_points is not None:
-    # Generate waypoints along the spline
-    waypoints = generate_waypoints_along_spline(spline_points)
+    # Generate equidistant waypoints along the spline
+    waypoints = generate_equidistant_points(spline_points, num_points=100)
     
     # Print the generated waypoints
     print("Generated Waypoints:")
